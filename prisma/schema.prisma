@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// PanelPact — Rebrand from InkMatch
+// Sweat-Equity Creator Pact Platform for Manga / Manhwa / Webtoons
+
+model User {
+  id                 String   @id @default(cuid())
+  name               String
+  handle             String   @unique
+  avatarUrl          String?
+  role               Role
+  secondaryRoles     Role[]
+  bio                String   @db.Text
+  genres             Genre[]
+  formats            Format[]
+  dealTypes          DealType[]
+  completionRate     Float    @default(100)
+  isVerified         Boolean  @default(false)
+  ratingScore        Float    @default(5.0)
+  reviewCount        Int      @default(0)
+  portfolioLinks     Json?    // [{type, url, title, format}]
+  vaultUrls          String[] // Quick-Send Vault: speedpaint / workflow videos
+  completedProjects  Int      @default(0)
+  createdAt          DateTime @default(now())
+  lastActiveAt       DateTime @default(now())
+
+  sentMatches        MatchRequest[] @relation("SentMatches")
+  receivedMatches    MatchRequest[] @relation("ReceivedMatches")
+  projects           ProjectMember[]
+  reviews            Review[]       @relation("ReviewsReceived")
+}
+
+model MatchRequest {
+  id               String      @id @default(cuid())
+  senderId         String
+  sender           User        @relation("SentMatches", fields: [senderId], references: [id])
+  recipientId      String
+  recipient        User        @relation("ReceivedMatches", fields: [recipientId], references: [id])
+  status           MatchStatus @default(PENDING)
+  message          String?     @db.Text
+  dealType         DealType
+  genreTag         Genre?
+  openedAt         DateTime?
+  timerExpiresAt   DateTime?
+  submittedWorkUrl String?
+  squadId          String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([recipientId, status])
+  @@index([senderId, status])
+}
+
+model Project {
+  id              String     @id @default(cuid())
+  title           String
+  description     String     @db.Text
+  format          Format
+  genreTags       Genre[]
+  dealType        DealType
+  status          ProjectStatus @default(ACTIVE)
+  agreementPdfUrl String?
+  coverUrl        String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  members         ProjectMember[]
+  milestones      Milestone[]
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  role      Role
+  equity    Float    // 50 for 50/50, etc.
+  joinedAt  DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id])
+  title       String
+  description String?         @db.Text
+  status      MilestoneStatus @default(PENDING)
+  order       Int
+  completedAt DateTime?
+  dueAt       DateTime?
+
+  @@index([projectId, order])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  reviewerId String
+  revieweeId String
+  reviewee   User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  projectId  String?
+  rating     Float
+  communication Int
+  speed         Int
+  reliability   Int
+  feedbackReceptivity Int
+  comment    String   @db.Text
+  createdAt  DateTime @default(now())
+}
+
+model StudioSquad {
+  id        String   @id @default(cuid())
+  name      String
+  memberIds String[]
+  seeking   Role     // role they want to fill
+  genre     Genre?
+  format    Format?
+  dealType  DealType
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  WRITER
+  STORYBOARDER
+  LINE_ARTIST
+  COLORIST
+  LETTERER
+  EDITOR
+}
+
+enum Genre {
+  ISEKAI
+  LITRPG
+  CULTIVATION
+  SHONEN
+  SHOJO
+  SEINEN
+  SLICE_OF_LIFE
+  OTOME
+  HORROR
+  SCI_FI
+  FANTASY
+  ROMANCE
+}
+
+enum Format {
+  VERTICAL_WEBTOON
+  PAGE_MANGA
+}
+
+enum DealType {
+  SWEAT_EQUITY_50_50
+  SKILL_SWAP
+  PORTFOLIO_BUILDING
+  PAID_GIG
+}
+
+enum MatchStatus {
+  PENDING
+  OPENED
+  ACCEPTED
+  AUTO_CANCELLED
+  DECLINED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  GHOSTED_CLAIMED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
